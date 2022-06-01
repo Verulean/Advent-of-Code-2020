@@ -1,7 +1,7 @@
 ﻿namespace AdventOfCode17;
 
 /// <summary>
-/// Class <class>AdventOfCode17</class> implements a solution to 2020 Advent of Code Day 17: Conway Cubes.
+/// Class <c>AdventOfCode17</c> implements a solution to 2020 Advent of Code Day 17: Conway Cubes.
 /// </summary>
 internal static class AdventOfCode17
 {
@@ -11,7 +11,7 @@ internal static class AdventOfCode17
     private const int Cycles = 6;
 
     /// <summary>
-    /// Class <class>TesseractGrid</class> models an infinite grid of cells following the cellular automata rules
+    /// Class <c>TesseractGrid</c> models an infinite grid of cells following the cellular automata rules
     /// defined in Day 17 of Advent of Code 2020.
     /// </summary>
     private class TesseractGrid
@@ -77,6 +77,13 @@ internal static class AdventOfCode17
         /// </returns>
         private IEnumerable<(int, int, int, int)> Neighbors(int i, int j, int k, int l)
         {
+            // return from ii in Enumerable.Range(i - 1, 3)
+            //     from jj in Enumerable.Range(j - 1, 3)
+            //     from kk in Enumerable.Range(k - 1, 3)
+            //     from ll in Enumerable.Range(l - 1, 3)
+            //     where (IsInBounds(ii, jj, kk, ll) && (ii != i || jj != j || kk != k || ll != l))
+            //     from pos in Enumerable.Repeat((ii, jj, kk, ll), (k == 0 && kk != 0 ? 2 : 1) * (l == 0 && ll != 0 ? 2 : 1))
+            //     select pos;
             for (var ii = i - 1; ii < i + 2; ii++)
             {
                 for (var jj = j - 1; jj < j + 2; jj++)
@@ -107,7 +114,12 @@ internal static class AdventOfCode17
         /// </returns>
         private IEnumerable<(int, int, int, int)> Positions()
         {
-            for (var i = 0; i < _m; i++)
+            // return from i in Enumerable.Range(0, _m)
+            //     from j in Enumerable.Range(0, _n)
+            //     from k in Enumerable.Range(0, _o)
+            //     from l in Enumerable.Range(0, _p)
+            //     select (i, j, k, l);
+            for (var i = 0; i < _m; i++) 
             {
                 for (var j = 0; j < _n; j++)
                 {
@@ -135,8 +147,17 @@ internal static class AdventOfCode17
         /// </returns>
         private char NextCubeState(int i, int j, int k, int l)
         {
-            var activeNeighbors = Neighbors(i, j, k, l)
-                .Count(pos => _grid[pos.Item1, pos.Item2, pos.Item3, pos.Item4] == '#');
+            // var activeNeighbors = Neighbors(i, j, k, l)
+            //     .Count(((int i, int j, int k, int l) pos) => _grid[pos.i, pos.j, pos.k, pos.l] == '#');
+            var activeNeighbors = 0;
+            foreach (var (ii, jj, kk, ll) in Neighbors(i, j, k, l))
+            {
+                if (_grid[ii, jj, kk, ll] == '#')
+                {
+                    activeNeighbors++;
+                }
+            }
+            
             return _grid[i, j, k, l] switch
             {
                 '#' => activeNeighbors is 2 or 3 ? '#' : '.',
@@ -167,12 +188,10 @@ internal static class AdventOfCode17
             var count = 0;
             foreach (var (i, j, k, l) in Positions())
             {
-                // Determine the multiplicity of the given index due to grid symmetry.
-                var multiplicity = (k != 0 ? 2 : 1) * (l != 0 ? 2 : 1);
-
                 if (_grid[i, j, k, l] == '#')
                 {
-                    count += multiplicity;
+                    // Increment by the multiplicity of the given index due to grid symmetry.
+                    count += (k != 0 ? 2 : 1) * (l != 0 ? 2 : 1);
                 }
             }
 
