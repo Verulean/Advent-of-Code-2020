@@ -1,10 +1,8 @@
-﻿using System.Collections;
-
-namespace AdventOfCode19;
+﻿namespace AdventOfCode19;
 
 internal static class AdventOfCode19
 {
-    private static IEnumerable<string> StringPermutations(List<List<object>> possibilities)
+    private static IEnumerable<string> StringCombinations(List<List<string>> possibilities)
     {
         switch (possibilities.Count)
         {
@@ -14,18 +12,18 @@ internal static class AdventOfCode19
             {
                 foreach (var elem in possibilities.Single())
                 {
-                    yield return (string)elem;
+                    yield return elem;
                 }
 
                 yield break;
             }
             default:
             {
-                foreach (var tail in StringPermutations(possibilities.GetRange(1, possibilities.Count - 1)))
+                foreach (var tail in StringCombinations(possibilities.GetRange(1, possibilities.Count - 1)))
                 {
                     foreach (var elem in possibilities.First())
                     {
-                        yield return (string)elem + tail;
+                        yield return elem + tail;
                     }
                 }
 
@@ -34,8 +32,15 @@ internal static class AdventOfCode19
         }
     }
 
+
     private class Rule
     {
+        private record Element;
+
+        private record IdList(List<int> Ids) : Element;
+
+        private record PossibilityList(List<string> Possibilities) : Element;
+        
         public Rule(string line)
         {
             line = line.Trim();
@@ -43,7 +48,7 @@ internal static class AdventOfCode19
             
             Id = int.Parse(elements[0]);
             Known = new HashSet<string>();
-            _unknown = new List<List<object>>();
+            _unknown = new List<Element>();
             
             if (elements[1].Contains('"'))
             {
@@ -53,29 +58,30 @@ internal static class AdventOfCode19
             {
                 foreach (var possibility in elements[1].Split(" | "))
                 {
-                    _unknown.Add(possibility
+                    var ids = new IdList(possibility
                         .Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                        .Select(x => (object)int.Parse(x))
+                        .Select(int.Parse)
                         .ToList()
                     );
+                    _unknown.Add(ids);
                 }
             }
         }
-        
+
         public readonly int Id;
         public readonly HashSet<string> Known;
-        private readonly List<List<object>> _unknown;
+        private readonly List<Element> _unknown;
 
         public bool IsReduced => _unknown.Count == 0;
 
-        public bool IsKnowable(ICollection<int> knownIds)
+        private bool IsDetermined(IReadOnlyDictionary<int, HashSet<string>> knownIds)
         {
-            foreach (var elem in _unknown.SelectMany(x => x))
+            foreach (var elem in _unknown)
             {
                 switch (elem)
                 {
-                    case int id:
-                        if (!knownIds.Contains(id))
+                    case IdList otherIds:
+                        if (!otherIds.Ids.All(knownIds.ContainsKey))
                         {
                             return false;
                         }
@@ -87,38 +93,21 @@ internal static class AdventOfCode19
             return true;
         }
 
-        public void Simplify(IReadOnlyDictionary<int, HashSet<string>> known)
+        public bool TrySimplify(IReadOnlyDictionary<int, HashSet<string>> known)
         {
-            foreach (var possibility in _unknown)
+            if (!IsDetermined(known)) return false;
+            
+            foreach (var possibility in _unknown.OfType<IdList>())
             {
-                for (var j = 0; j < possibility.Count; j++)
-                {
-                    switch (possibility[j])
-                    {
-                        case int otherId:
-                            if (!known.TryGetValue(otherId, out var p)) continue;
-                            possibility[j] = p.ToList();
-                            break;
-                    }
-                }
-            }
-
-            foreach (var possibility in _unknown)
-            {
-                var goodLang = new List<List<object>>();
-                foreach (var elem in possibility)
-                {
-                    if (elem is not IEnumerable enumerable) continue;
-                    List<object> l = enumerable.Cast<object?>().ToList()!;
-                    goodLang.Add(l);
-                }
-                foreach (var outcome in StringPermutations(goodLang))
+                var substituted = possibility.Ids.Select(id => known[id].ToList()).ToList();
+                foreach (var outcome in StringCombinations(substituted))
                 {
                     Known.Add(outcome);
                 }
             }
 
             _unknown.Clear();
+            return true;
         }
     }
 
@@ -137,10 +126,10 @@ internal static class AdventOfCode19
                 rules.Remove(rule.Id);
             }
             
-            // Fully simplify any outstanding rules, wherever possible.
-            foreach (var rule in rules.Values.Where(rule => rule.IsKnowable(known.Keys)))
+            // Fully simplify any outstanding rules, if possible.
+            foreach (var rule in rules.Values)
             {
-                rule.Simplify(known);
+                rule.TrySimplify(known);
             }
         }
 
@@ -225,6 +214,6 @@ internal static class AdventOfCode19
         var knownB = GenerateDeterminedRules(rulesB, new[] { 31, 42 });
         var validatorB = new ValidatorB(knownB);
         var resultB = messages.Count(message => validatorB.IsValid(message));
-        Console.Write($"B: {resultB}");
+        Console.WriteLine($"B: {resultB}");
     }
 }
