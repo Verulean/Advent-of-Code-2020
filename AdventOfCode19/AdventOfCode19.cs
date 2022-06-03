@@ -31,16 +31,9 @@ internal static class AdventOfCode19
             }
         }
     }
-
-
+    
     private class Rule
     {
-        private record Element;
-
-        private record IdList(List<int> Ids) : Element;
-
-        private record PossibilityList(List<string> Possibilities) : Element;
-        
         public Rule(string line)
         {
             line = line.Trim();
@@ -48,7 +41,7 @@ internal static class AdventOfCode19
             
             Id = int.Parse(elements[0]);
             Known = new HashSet<string>();
-            _unknown = new List<Element>();
+            _unknown = new List<List<int>>();
             
             if (elements[1].Contains('"'))
             {
@@ -58,11 +51,10 @@ internal static class AdventOfCode19
             {
                 foreach (var possibility in elements[1].Split(" | "))
                 {
-                    var ids = new IdList(possibility
+                    var ids = possibility
                         .Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                         .Select(int.Parse)
-                        .ToList()
-                    );
+                        .ToList();
                     _unknown.Add(ids);
                 }
             }
@@ -70,36 +62,22 @@ internal static class AdventOfCode19
 
         public readonly int Id;
         public readonly HashSet<string> Known;
-        private readonly List<Element> _unknown;
+        private readonly List<List<int>> _unknown;
 
         public bool IsReduced => _unknown.Count == 0;
 
         private bool IsDetermined(IReadOnlyDictionary<int, HashSet<string>> knownIds)
         {
-            foreach (var elem in _unknown)
-            {
-                switch (elem)
-                {
-                    case IdList otherIds:
-                        if (!otherIds.Ids.All(knownIds.ContainsKey))
-                        {
-                            return false;
-                        }
-
-                        break;
-                }
-            }
-
-            return true;
+            return _unknown.All(elem => elem.All(knownIds.ContainsKey));
         }
 
         public bool TrySimplify(IReadOnlyDictionary<int, HashSet<string>> known)
         {
             if (!IsDetermined(known)) return false;
             
-            foreach (var possibility in _unknown.OfType<IdList>())
+            foreach (var possibility in _unknown)
             {
-                var substituted = possibility.Ids.Select(id => known[id].ToList()).ToList();
+                var substituted = possibility.Select(id => known[id].ToList()).ToList();
                 foreach (var outcome in StringCombinations(substituted))
                 {
                     Known.Add(outcome);
