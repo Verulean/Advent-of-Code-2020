@@ -2,7 +2,7 @@
 
 internal static class AdventOfCode21
 {
-    public static (HashSet<string>, HashSet<string>) ParseLine(string line)
+    private static (HashSet<string>, HashSet<string>) ParseLine(string line)
     {
         var blocks = line.Trim().TrimEnd(')').Split(" (contains ");
         var ingredients = blocks[0].Split(' ').Select(x => x.Trim()).ToHashSet();
@@ -32,7 +32,7 @@ internal static class AdventOfCode21
         }
 
         // Cross-reference to identify the exact ingredient for each allergen.
-        var allergenKey = new Dictionary<string, string>();
+        var allergenKey = new SortedDictionary<string, string>();
         while (allergenMap.Count > 0)
         {
             foreach (var (allergen, possibilities) in allergenMap)
@@ -52,14 +52,12 @@ internal static class AdventOfCode21
         var potentialAllergens = allergenKey.Values.ToHashSet();
 
         var resultA = data
-            .Sum(((HashSet<string> ingredients, HashSet<string> allergens) line) => 
-                line.ingredients.Except(potentialAllergens).Count());
-        Console.WriteLine($"A: {resultA}");
-        
-        var resultB = string.Join(
-            ',',
-            allergenKey.OrderBy(x => x.Key).Select(x => x.Value)
+            .Sum(((HashSet<string> ingredients, HashSet<string> allergens) line) =>
+                line.ingredients.Except(potentialAllergens).Count()
             );
+        Console.WriteLine($"A: {resultA}");
+
+        var resultB = string.Join(',', allergenKey.Values);
         Console.WriteLine($"B: {resultB}");
     }
 }
