@@ -14,4 +14,15 @@
         </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Numcs\Numcs.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="monster.txt" />
+      <Content Include="monster.txt">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
 </Project>

@@ -1,191 +1,69 @@
-﻿using System.Collections;
-using System.Net;
-using System.Xml.Xsl;
+﻿using Numcs;
 
 namespace AdventOfCode20;
 
 internal static class AdventOfCode20
 {
-    private static bool[] OrientMatches(bool[] matches, (bool flip, int rotations) orientation)
+    private static readonly List<(bool, int)> Orientations = new()
     {
-        var rotations = (orientation.rotations % 4 + 4) % 4;
-        var tempMatches = matches.ToArray();
-        // top, bottom, left, right
-        if (orientation.flip)
-        {
-            (tempMatches[0], tempMatches[1]) = (tempMatches[1], tempMatches[0]);
-        }
+        (false, 0), (false, 1), (false, 2), (false, 3),
+        (true, 0), (true, 1), (true, 2), (true, 3)
+    };
 
-        var newMatches = new bool[matches.Length];
-        switch (rotations)
-        {
-            case 0:
-                newMatches = tempMatches;
-                break;
-            case 3:
-                newMatches[0] = tempMatches[2];
-                newMatches[1] = tempMatches[3];
-                newMatches[2] = tempMatches[1];
-                newMatches[3] = tempMatches[0];
-                break;
-            case 2:
-                newMatches[0] = tempMatches[1];
-                newMatches[1] = tempMatches[0];
-                newMatches[2] = tempMatches[3];
-                newMatches[3] = tempMatches[2];
-                break;
-            case 1:
-                newMatches[0] = tempMatches[3];
-                newMatches[1] = tempMatches[2];
-                newMatches[2] = tempMatches[0];
-                newMatches[3] = tempMatches[1];
-                break;
-        }
-
-        return newMatches;
+    private enum Sides
+    {
+        Top = 0,
+        Right = 1,
+        Bottom = 2,
+        Left = 3
     }
     
-    private class CharGrid
+    private class CharGrid : Array2D<char>
     {
-        public static readonly List<(bool, int)> Orientations = new()
+        public CharGrid(char[,] tile) : base(tile)
         {
-            (false, 0), (false, 1), (false, 2), (false, 3),
-            (true, 0), (true, 1), (true, 2), (true, 3)
-        };
-        
-        private enum Axis
+            Grid = new Array2D<char>(tile);
+        }
+
+        public Array2D<char> Grid;
+
+        public void SetOrientation(bool flip, int rotations)
         {
-            X = 0,
-            Y = 1
+            Grid = flip ? FlipUD().Rot90(rotations) : Rot90(rotations);
         }
         
-        public CharGrid(char[,] tile, int n)
+        private Array1D<char> GetEdge(int fixedAxis, int fixedIndex)
         {
-            _startGrid = tile;
-            Grid = _startGrid;
-            N = n;
-        }
-
-        public static char[,] Rotate(char[,] grid, int n, int rotations)
-        {
-            rotations = (rotations % 4 + 4) % 4;
-            
-            var newGrid = new char[n, n];
-            for (var i = 0; i < n; i++)
+            return fixedAxis switch
             {
-                for (var j = 0; j < n; j++)
-                {
-                    newGrid[i, j] = grid[i, j];
-                }
-            }
-            switch (rotations)
-            {
-                case 0:
-                    return newGrid;
-                case 1:
-                {
-                    for (var i = 0; i < n; i++)
-                    {
-                        for (var j = 0; j < n; j++)
-                        {
-                            newGrid[i, j] = grid[j, n - i - 1];
-                        }
-                    }
-
-                    return newGrid;
-                }
-                default:
-                {
-                    for (var r = 0; r < rotations; r++)
-                    {
-                        newGrid = Rotate(newGrid, n, 1);
-                    }
-
-                    return newGrid;
-                }
-            }
-        }
-
-        public void SetOrientation(int rotations = 0, bool flip = false)
-        {
-            char[,] temp;
-            if (flip)
-            {
-                temp = new char[N, N];
-                for (var i = 0; i < N; i++)
-                {
-                    for (var j = 0; j < N; j++)
-                    {
-                        temp[i, j] = _startGrid[N - 1 - i, j];
-                    }
-                }
-            }
-            else
-            {
-                temp = _startGrid;
-            }
-            
-            Grid = Rotate(temp, N, rotations);
-            Orientation = (flip, rotations);
-        }
-
-        private char[] GetEdge(Axis fixedAxis, int fixedIndex)
-        {
-            var edge = new char[N];
-            switch (fixedAxis)
-            {
-                case Axis.X:
-                {
-                    for (var i = 0; i < N; i++)
-                    {
-                        edge[i] = Grid[i, fixedIndex];
-                    }
-
-                    break;
-                }
-                case Axis.Y:
-                {
-                    for (var j = 0; j < N; j++)
-                    {
-                        edge[j] = Grid[fixedIndex, j];
-                    }
-
-                    break;
-                }
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(fixedAxis), fixedAxis, "Axis index out of bounds for 2D CharGrid.");
-            }
-
-            return edge;
+                0 => Grid[fixedIndex, ..],
+                1 => Grid[.., fixedIndex],
+                _ => throw new ArgumentException($"Invalid axis for 2D array '{fixedAxis}'.")
+            };
         }
         
-        private char[,] _startGrid;
-        public char[,] Grid;
-        public int N { get; }
-        public (bool flip, int rot) Orientation = (false, 0);
-
-        public char[] Left => GetEdge(Axis.X, 0);
-        public char[] Right => GetEdge(Axis.X, N - 1);
-        public char[] Top => GetEdge(Axis.Y, 0);
-        public char[] Bottom => GetEdge(Axis.Y, N - 1);
-        public char[][] Edges => new[] { Top, Bottom, Left, Right };
+        public Array1D<char> Left => GetEdge(1, 0);
+        public Array1D<char> Right => GetEdge(1, _n - 1);
+        public Array1D<char> Top => GetEdge(0, 0);
+        public Array1D<char> Bottom => GetEdge(0, _m - 1);
+        public Array1D<char>[] Edges => new[] { Top, Right, Bottom, Left };
     }
     
-    private class ImageTile
+    private class ImageTile : CharGrid
     {
-        public enum TileType
+        public ImageTile(int id, char[,] tile) : base(tile)
         {
-            Corner = 2,
-            Edge = 3,
-            Center = 4
+            Id = id;
         }
 
-        public ImageTile(string input)
+        public ImageTile((int id, char[,] tile) parse) : this(parse.id, parse.tile) {}
+
+        public static (int, char[,]) ParseText(string input)
         {
             var lines = input.Split('\n');
             var n = lines.Length - 1;
-
-            Id = int.Parse(lines[0].TrimEnd(':').Split(' ')[^1]);
+        
+            var id = int.Parse(lines[0].TrimEnd(':').Split(' ')[^1]);
             var grid = new char[n, n];
             for (var i = 0; i < n; i++)
             {
@@ -195,25 +73,19 @@ internal static class AdventOfCode20
                 }
             }
 
-            Tile = new CharGrid(grid, n);
+            return (id, grid);
         }
 
         public readonly int Id;
-        public CharGrid Tile;
-        private bool[] _free = new[] { true, true, true, true };
-        public bool[] Free => OrientMatches(_free, Tile.Orientation);
-        public TileType Location = TileType.Center;
 
         public bool[] PossibleMatches(ImageTile other)
         {
             var hits = new bool[] { false, false, false, false };
-            foreach (var (edge, i) in Tile.Edges.Select((e, i) => (e, i)))
+            foreach (var (edge, i) in Edges.Select((e, i) => (e, i)))
             {
-                foreach (var otherEdge in other.Tile.Edges)
+                if (other.Edges.Any(otherEdge => edge.ArrayEquals(otherEdge) || edge.ArrayEquals(otherEdge.Reverse())))
                 {
-                    if (!edge.SequenceEqual(otherEdge) && !edge.SequenceEqual(otherEdge.Reverse())) continue;
                     hits[i] = true;
-                    break;
                 }
             }
 
@@ -224,41 +96,45 @@ internal static class AdventOfCode20
         {
             return from tile in others where PossibleMatches(tile).Any() select tile.Id;
         }
-
-        public void SetType(TileType t, bool[] matchable)
-        {
-            _free = matchable.ToArray();
-            Location = t;
-        }
     }
 
     private class MonsterValidator
     {
-        public MonsterValidator(string pattern)
+        public MonsterValidator(string pattern, char body = '#')
         {
-            var lines = pattern.Trim().Split('\n');
+            var lines = pattern.Split('\n');
             _m = lines.Length;
             _n = lines[0].Length;
-            _pattern = new char[_m, _n];
+
+            _pattern = new HashSet<(int, int)>();
             Size = 0;
             for (var i = 0; i < _m; i++)
             {
                 for (var j = 0; j < _n; j++)
                 {
                     var c = lines[i][j];
-                    if (c == '#') Size++;
-                    _pattern[i, j] = c;
+                    if (c == body)
+                    {
+                        Size++;
+                        _pattern.Add((i, j));
+                    };
                 }
             }
         }
-
-        private readonly char[,] _pattern;
+        
+        private readonly HashSet<(int, int)> _pattern;
         private readonly int _m;
         private readonly int _n;
         public int Size;
 
-        public bool IsMonster(char[,] grid, int n, int i, int j)
+        public IEnumerable<(int, int)> Indices()
         {
+            return from pos in _pattern select pos;
+        }
+        
+        public bool IsMonster(char[,] grid, int i, int j)
+        {
+            var n = grid.GetLength(0);
             for (var di = 0; di < _m; di++)
             {
                 var ii = i + di;
@@ -266,7 +142,7 @@ internal static class AdventOfCode20
                 for (var dj = 0; dj < _n; dj++)
                 {
                     var jj = j + dj;
-                    if (jj >= n || (_pattern[di, dj] == '#' && grid[ii, jj] != '#')) return false;
+                    if (jj >= n || (_pattern.Contains((di, dj)) && grid[ii, jj] == '.')) return false;
                 }
             }
 
@@ -277,9 +153,10 @@ internal static class AdventOfCode20
     public static async Task Main()
     {
         var data = (await File.ReadAllTextAsync("input.txt"))
-            .Split("\n\n", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .ToArray();
-        var tiles = data.Select(tile => new ImageTile(tile)).ToDictionary(x => x.Id, x => x);
+            .Split("\n\n", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var tiles = data
+            .Select(tile => new ImageTile(ImageTile.ParseText(tile)))
+            .ToDictionary(x => x.Id, x => x);
         
         // For each tile, determine edges that cannot possibly match anything (must be on outer boundary).
         var matches = new Dictionary<int, bool[]>();
@@ -303,193 +180,351 @@ internal static class AdventOfCode20
             }
         }
 
+        var borderEdges = new HashSet<string>();
+        foreach (var (id, hits) in matches)
+        {
+            var e = tiles[id].Edges;
+            for (var i = 0; i < e.Length; i++)
+            {
+                if (hits[i]) continue;
+                var edge = string.Join("", e[i]);
+                borderEdges.Add(edge);
+                borderEdges.Add(edge.Reverse());
+            }
+        }
+        
         // Use the information from above to find the edge/corner tiles.
-        var corners = new List<ImageTile>();
-        var edges = new List<ImageTile>();
-        var centers = new List<ImageTile>();
-        var borderIds = corners.Select(x => x.Id).Union(edges.Select(x => x.Id)).ToHashSet();
+        var cornerIds = new List<int>();
+        var borderIds = new List<int>();
+        var centerIds = new List<int>();
         foreach (var (id, hits) in matches)
         {
             switch (hits.Count(x => x))
             {
                 case 2:
-                    tiles[id].SetType(ImageTile.TileType.Corner, matches[id]);
-                    edges.Add(tiles[id]);
-                    corners.Add(tiles[id]);
+                    cornerIds.Add(id);
+                    borderIds.Add(id);
                     break;
                 case 3:
-                    tiles[id].SetType(ImageTile.TileType.Edge, matches[id]);
-                    edges.Add(tiles[id]);
+                    borderIds.Add(id);
                     break;
                 default:
-                    centers.Add(tiles[id]);
+                    centerIds.Add(id);
                     break;
             }
         }
 
         // Part A, product of corner tile IDs
-        var resultA = corners.Aggregate(1ul, (acc, curr) => acc * (ulong)curr.Id);
+        var resultA = cornerIds.Aggregate(1ul, (acc, curr) => acc * (ulong)curr);
         Console.WriteLine($"A: {resultA}");
-
-
-
-
-        var test = new char[3, 3] { {'1', '2', '3'},{'4', '5', '6'},{'7','8','9'}};
-
-        void PrintArr(char[,] grid, int n)
-        {
-            for (var i = 0; i < n; i++)
-            {
-                for (var j = 0; j < n; j++)
-                {
-                    Console.Write($"{grid[i, j]} ");
-                }
-                Console.Write('\n');
-            }
-            Console.Write('\n');
-        }
-        PrintArr(test, 3);
-        PrintArr(CharGrid.Rotate(test, 3, 3), 3);
-        Console.WriteLine(edges.Count);
-
-
-
-
-        // Begin building process.
-        var sideLength = edges.Count / 4 + 1;
-        var imageGrid = new ImageTile[sideLength, sideLength];
-        var topEdgeQueue = new Queue<(HashSet<int>, List<(int, bool, int)>)>();
         
-        // Start queue with a corner tile at the top left corner.
-        var tileNW = corners[0]; // checked by hand
-        foreach (var (f, r) in CharGrid.Orientations)
+        var sideLength = borderIds.Count / 4 + 1;
+        var borderQueue = new Queue<(HashSet<int>, List<(int, bool, int)>)>();
+
+        (HashSet<int>, int, int) BorderConstraints(int i)
         {
-            tileNW.Tile.SetOrientation(r, f);
-            var free = tileNW.Free;
-            if (free[0] || free[2]) continue;
-            topEdgeQueue.Enqueue((new HashSet<int>() { tileNW.Id },
-                new List<(int, bool, int)>() { (tileNW.Id, f, r) }));
-            break;
-        }
-        
-        Console.WriteLine($"Starting queue size: {topEdgeQueue.Count}\nSide length: {sideLength}");
-        
-        // Fill top edge.
-        var tops = new List<List<int>>();
-        while (topEdgeQueue.Count > 0)
-        {
-            var (usedIds, topEdge) = topEdgeQueue.Dequeue();
-            var length = topEdge.Count;
+            var outerEdges = new HashSet<int>();
+            int prevEdge;
+            int currEdge;
             
-            // Extract finished border
-            if (usedIds.SetEquals(borderIds))// || length >= sideLength - 1)
+            switch (Math.DivRem(i, sideLength - 1))
             {
-                tops.Add(topEdge.Select(((int id, bool flip, int rot) tile) => tile.id).ToList());
+                case (0, 0):
+                    outerEdges.Add((int)Sides.Left);
+                    outerEdges.Add((int)Sides.Top);
+                    prevEdge = (int)Sides.Top;
+                    currEdge = (int)Sides.Bottom;
+                    break;
+                case (1, 0):
+                    outerEdges.Add((int)Sides.Top);
+                    outerEdges.Add((int)Sides.Right);
+                    prevEdge = (int)Sides.Right;
+                    currEdge = (int)Sides.Left;
+                    break;
+                case (2, 0):
+                    outerEdges.Add((int)Sides.Right);
+                    outerEdges.Add((int)Sides.Bottom);
+                    prevEdge = (int)Sides.Bottom;
+                    currEdge = (int)Sides.Top;
+                    break;
+                case (3, 0):
+                    outerEdges.Add((int)Sides.Bottom);
+                    outerEdges.Add((int)Sides.Left);
+                    prevEdge = (int)Sides.Left;
+                    currEdge = (int)Sides.Right;
+                    break;
+                case (0, _):
+                    outerEdges.Add((int)Sides.Top);
+                    prevEdge = (int)Sides.Right;
+                    currEdge = (int)Sides.Left;
+                    break;
+                case (1, _):
+                    outerEdges.Add((int)Sides.Right);
+                    prevEdge = (int)Sides.Bottom;
+                    currEdge = (int)Sides.Top;
+                    break;
+                case (2, _):
+                    outerEdges.Add((int)Sides.Bottom);
+                    prevEdge = (int)Sides.Left;
+                    currEdge = (int)Sides.Right;
+                    break;
+                case (3, _):
+                    outerEdges.Add((int)Sides.Left);
+                    prevEdge = (int)Sides.Top;
+                    currEdge = (int)Sides.Bottom;
+                    break;
+                default:
+                    throw new ArgumentException("Boundary tile index exceeded total border length.");
+            }
+            
+            return (outerEdges, prevEdge, currEdge);
+        }
+
+        IEnumerable<(bool, int)> ValidBorderOrientations(IReadOnlyCollection<int> outerEdges, ImageTile tile)
+        {
+            foreach (var (f, r) in Orientations)
+            {
+                tile.SetOrientation(f, r);
+                var e = tile.Edges;
+                if (outerEdges.All(i => borderEdges.Contains(string.Join("", e[i])))) yield return (f, r);
+            }
+        }
+
+        var (borderStartEdges, _, _) = BorderConstraints(0);
+        var (borderStartF, borderStartR) = ValidBorderOrientations(borderStartEdges, tiles[cornerIds[0]]).First();
+        borderQueue.Enqueue(
+            (
+                new HashSet<int> { cornerIds[0] },
+                new List<(int, bool, int)> { (cornerIds[0], borderStartF, borderStartR) }
+            )
+        );
+
+        List<(int, bool, int)> border = null;
+        while (borderQueue.Count > 0)
+        {
+            var (usedIds, currBorder) = borderQueue.Dequeue();
+            var length = currBorder.Count;
+
+            if (usedIds.SetEquals(borderIds))
+            {
+                border = currBorder;
+                break;
+            }
+
+            var (prevId, prevF, prevR) = currBorder.Last();
+            var prevTile = tiles[prevId];
+            prevTile.SetOrientation(prevF, prevR);
+            var prevEdges = prevTile.Edges;
+
+            var (currWalls, prevEdgeIndex, currEdgeIndex) = BorderConstraints(length);
+
+            foreach (var id in borderIds.Where(x => !usedIds.Contains(x)))
+            {
+                var tile = tiles[id];
+                foreach (var (f, r) in ValidBorderOrientations(currWalls, tile))
+                {
+                    tile.SetOrientation(f, r);
+                    var currEdges = tile.Edges;
+                    if (!prevEdges[prevEdgeIndex].ArrayEquals(currEdges[currEdgeIndex])) continue;
+
+                    var newUsedIds = new HashSet<int>(usedIds) { tile.Id };
+                    var newBorderSequence = currBorder.ToList();
+                    newBorderSequence.Add((tile.Id, f, r));
+                    
+                    borderQueue.Enqueue((newUsedIds, newBorderSequence));
+                }
+            }
+        }
+
+        var tileArrangement = new Dictionary<(int, int), (int, bool, int)>();
+        foreach (var (x, i) in border.Select((x, i) => (x, i)))
+        {
+            var (q, r) = Math.DivRem(i, sideLength - 1);
+            var pos = q switch
+            {
+                0 => (0, r),
+                1 => (r, sideLength - 1),
+                2 => (sideLength - 1, sideLength - 1 - r),
+                3 => (sideLength - 1 - r, 0),
+                _ => throw new ArgumentException("More border tiles provided than possible.")
+            };
+            tileArrangement[pos] = x;
+        }
+        
+        // Reconstruct center of image.
+        bool IsValidPlacement(int i, int j, ImageTile tile, Dictionary<(int, int), (int, bool, int)> placed)
+        {
+            if (placed.TryGetValue((i - 1, j), out (int id, bool flip, int rot) up))
+            {
+                tiles[up.id].SetOrientation(up.flip, up.rot);
+                if (!tiles[up.id].Bottom.ArrayEquals(tile.Top)) return false;
+            }
+            if (placed.TryGetValue((i, j + 1), out (int id, bool flip, int rot) right))
+            {
+                tiles[right.id].SetOrientation(right.flip, right.rot);
+                if (!tiles[right.id].Left.ArrayEquals(tile.Right)) return false;
+            }
+            if (placed.TryGetValue((i + 1, j), out (int id, bool flip, int rot) down))
+            {
+                tiles[down.id].SetOrientation(down.flip, down.rot);
+                if (!tiles[down.id].Top.ArrayEquals(tile.Bottom)) return false;
+            }
+            if (placed.TryGetValue((i, j - 1), out (int id, bool flip, int rot) left))
+            {
+                tiles[left.id].SetOrientation(left.flip, left.rot);
+                if (!tiles[left.id].Right.ArrayEquals(tile.Left)) return false;
+            }
+
+            return true;
+        }
+
+        (int, int) NextOpening(int i, int j)
+        {
+            var ii = i;
+            var jj = j + 1;
+            if (jj > sideLength - 2)
+            {
+                jj = 1;
+                ii++;
+            }
+
+            return (ii, jj);
+        }
+
+        Dictionary<(int, int), (int, bool, int)> CopyArrangementWith(Dictionary<(int, int), (int, bool, int)> curr,
+            (int, int) newKey, (int, bool, int) newValue)
+        {
+            var next = curr.ToDictionary(entry => entry.Key, entry => entry.Value);
+            next[newKey] = newValue;
+            return next;
+        }
+        
+        var centerQueue = new Queue<((int, int), HashSet<int>, Dictionary<(int, int), (int, bool, int)>)>();
+        foreach (var centerId in centerIds)
+        {
+            var tile = tiles[centerId];
+            foreach (var (f, r) in Orientations)
+            {
+                tile.SetOrientation(f, r);
+                if (!IsValidPlacement(1, 1, tile, tileArrangement)) continue;
+                var possibleUsedIds = new HashSet<int> { centerId };
+                var possibleArrangement = CopyArrangementWith(tileArrangement, (1, 1), (centerId, f, r));
+
+                centerQueue.Enqueue((NextOpening(1, 1), possibleUsedIds, possibleArrangement));
+            }
+        }
+
+        while (centerQueue.Count > 0)
+        {
+            var (currPos, currUsed, currArrangement) = centerQueue.Dequeue();
+            var (i, j) = currPos;
+
+            if (currUsed.SetEquals(centerIds))
+            {
+                tileArrangement = currArrangement;
                 continue;
             }
             
-            var (prevId, prevF, prevR) = topEdge.Last();
-            var prevTile = tiles[prevId];
-            prevTile.Tile.SetOrientation(prevR, prevF);
-
-            // 0,   1,      2,    3
-            // top, bottom, left, right
-            var (borderSides, sourceSide, destSide) = (Math.DivRem(length, sideLength - 1)) switch
+            foreach (var centerId in centerIds.Where(id => !currUsed.Contains(id)))
             {
-                (var n, 0) => n switch
+                var currTile = tiles[centerId];
+                foreach (var (f, r) in Orientations)
                 {
-                    0 => (new[] { 0, 2 }, 3, 2),
-                    1 => (new[] { 0, 3 }, 1, 0),
-                    2 => (new[] { 1, 3 }, 2, 3),
-                    3 => (new[] { 1, 2 }, 0, 1),
-                    _ => throw new ArgumentException("Unexpected border length encountered.")
-                },
-                (var n, _) => n switch
-                {
-                    0 => (new[] { 0 }, 3, 2),
-                    1 => (new[] { 3 }, 1, 0),
-                    2 => (new[] { 1 }, 2, 3),
-                    3 => (new[] { 2 }, 0, 1),
-                    _ => throw new ArgumentException("Unexpected border length encountered.")
-                }
-            };
+                    currTile.SetOrientation(f, r);
+                    if (!IsValidPlacement(i, j, currTile, currArrangement)) continue;
+                    var possibleUsedIds = new HashSet<int>(currUsed) { centerId };
+                    var possibleArrangement = CopyArrangementWith(currArrangement, currPos, (centerId, f, r));
 
-            foreach (var tile in edges.Where(tile => !usedIds.Contains(tile.Id)))
-            {
-                foreach (var (f, r) in CharGrid.Orientations)
-                {
-                    tile.Tile.SetOrientation(r, f);
-                    var free = tile.Free;
-
-                    if (borderSides.Any(i => free[i])) continue;
-                    if (!(tile.Tile.Edges[destSide].SequenceEqual(prevTile.Tile.Edges[sourceSide])
-                          || tile.Tile.Edges[destSide].SequenceEqual(prevTile.Tile.Edges[sourceSide].Reverse())))
-                        continue;
-
-                    // var newTopEdge = new List<(int, bool, int)>(topEdge) { (tile.Id, f, r) };
-                    var newTopEdge = new List<(int, bool, int)>();
-                    foreach (var (id, flip, rot) in topEdge)
-                    {
-                        newTopEdge.Add((id, flip, rot));
-                    }
-                    newTopEdge.Add((tile.Id, f, r));
-
-                    // var newUsed = new HashSet<int>(usedIds) { tile.Id };
-                    var newUsed = new HashSet<int>() { tile.Id };
-                    foreach (var id in usedIds)
-                    {
-                        newUsed.Add(id);
-                    }
-                    
-                    topEdgeQueue.Enqueue((newUsed, newTopEdge));
+                    centerQueue.Enqueue((NextOpening(i, j), possibleUsedIds, possibleArrangement));
                 }
             }
         }
-        Console.WriteLine($"Valid borders: {tops.Count}");
-        // Console.WriteLine(string.Join(", ", tops.First()));
-        
-        // for (var i = 1; i < sideLength - 1; i++)
-        // {
-        //     // Top
-        //     var foundTop = false;
-        //     foreach (var tile in edges)
-        //     {
-        //         foreach (var (f, r) in CharGrid.Orientations)
-        //         {
-        //             tile.Tile.SetOrientation(r, f);
-        //             var free = tile.Free;
-        //             if (free[0]) continue;
-        //             if (!tile.Tile.Left.SequenceEqual(imageGrid[i - 1, 0].Tile.Right)) continue;
-        //             Console.WriteLine($"Set [{i}, 0] to tile {tile.Id}");
-        //             imageGrid[i, 0] = tile;
-        //             edges.Remove(tile);
-        //             foundTop = true;
-        //             break;
-        //         }
-        //
-        //         if (foundTop) break;
-        //     }
-        //     
-        //     // Left
-        //     var foundLeft = false;
-        //     foreach (var tile in edges)
-        //     {
-        //         foreach (var (f, r) in CharGrid.Orientations)
-        //         {
-        //             tile.Tile.SetOrientation(r, f);
-        //             var free = tile.Free;
-        //             if (free[2]) continue;
-        //             if (!tile.Tile.Top.SequenceEqual(imageGrid[0, i - 1].Tile.Bottom)) continue;
-        //             Console.WriteLine($"Set [0, {i}] to tile {tile.Id}");
-        //             imageGrid[0, i] = tile;
-        //             edges.Remove(tile);
-        //             foundLeft = true;
-        //             break;
-        //         }
-        //
-        //         if (foundLeft) break;
-        //     }
-        // }
 
+        // Stitch tiles into a single image.
+        var tileSize = tiles.Values.First().Shape.Item1 - 2;
+        var imageSize = sideLength * tileSize;
+        var imgArr = new char[imageSize, imageSize];
+
+        for (var i = 0; i < sideLength; i++)
+        {
+            for (var j = 0; j < sideLength; j++)
+            {
+                var (currId, currF, currR) = tileArrangement[(i, j)];
+                var currTile = tiles[currId];
+                currTile.SetOrientation(currF, currR);
+                for (var ii = 0; ii < tileSize; ii++)
+                {
+                    for (var jj = 0; jj < tileSize; jj++)
+                    {
+                        imgArr[i * tileSize + ii, j * tileSize + jj] = currTile.Grid[ii + 1, jj + 1];
+                    }
+                }
+            }
+        }
+
+        var image = new CharGrid(imgArr);
+        
+        // Create sea monster validator from given pattern.
+        var validator = new MonsterValidator(await File.ReadAllTextAsync("monster.txt"));
+
+        (int monsters, int roughness) AnalyzeImage(CharGrid image)
+        {
+            var (m, n) = image.Shape;
+            var arr = image.Grid.ToArray();
+
+            var monsters = 0;
+            for (var i = 0; i < m; i++)
+            {
+                for (var j = 0; j < n; j++)
+                {
+                    if (!validator.IsMonster(arr, i, j)) continue;
+                    foreach (var (di, dj) in validator.Indices())
+                    {
+                        arr[i + di, j + dj] = 'O';
+                    }
+
+                    monsters++;
+                }
+            }
+
+            var roughness = 0;
+            for (var i = 0; i < m; i++)
+            {
+                for (var j = 0; j < n; j++)
+                {
+                    if (arr[i, j] != '#') continue;
+                    roughness++;
+                }
+            }
+
+            return (monsters, roughness);
+        }
+
+
+        // Find orientation of image that has recognizable monsters.
+        var maxMonsters = 0;
+        var resultB = 0;
+
+        foreach (var (f, r) in Orientations)
+        {
+            image.SetOrientation(f, r);
+            var (currMonsters, currRoughness) = AnalyzeImage(image);
+            if (currMonsters < maxMonsters || (currMonsters == maxMonsters && currRoughness >= resultB)) continue;
+            
+            maxMonsters = currMonsters;
+            resultB = currRoughness;
+        }
+
+        Console.WriteLine($"B: {resultB}");
+    }
+}
+
+internal static class StringUtil
+{
+    public static string Reverse(this string s)
+    {
+        var arr = s.ToCharArray();
+        Array.Reverse(arr);
+        return new string(arr);
     }
 }
